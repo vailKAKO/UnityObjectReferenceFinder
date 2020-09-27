@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using Object = UnityEngine.Object;
 
 public class ReferenceFinder : EditorWindow
 {
@@ -27,6 +29,13 @@ public class ReferenceFinder : EditorWindow
 
     private void OnGUI()
     {
+        
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Never change Scene before reset this window");
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("This window can search active scene objects and all prefabs");
+        EditorGUILayout.EndHorizontal();
         //Editorに枠を出して、入力を_targetComponentNameに格納する
         EditorGUILayout.BeginHorizontal();
         _targetComponentName =
@@ -50,11 +59,11 @@ public class ReferenceFinder : EditorWindow
 
             var guids = AssetDatabase.FindAssets("t:GameObject", null);
 
-
             foreach (var guid in guids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 var loadAsset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+
                 var typeCash = GetType(_targetComponentName) ?? null;
 
                 if (typeCash == null)
@@ -70,9 +79,26 @@ public class ReferenceFinder : EditorWindow
                     _foundAssets.Add(kari.gameObject);
                 }
             }
+
+            var allObj = GetObjectsInAllScene();
+            foreach (var obj in allObj)
+            {
+                var typeCash = GetType(_targetComponentName) ?? null;
+                var tmp = obj.GetComponentsInChildren(GetType(_targetComponentName) ?? null);
+
+                if (typeCash == null)
+                {
+                    Debug.Log("No Type Found.");
+                    return;
+                }
+
+                foreach (var kari in tmp)
+                {
+                    _foundAssets.Add(kari.gameObject);
+                }
+            }
         }
     }
-
 
     /// <summary>
     /// プロジェクト内に存在する全スクリプトファイル
@@ -143,5 +169,21 @@ public class ReferenceFinder : EditorWindow
             .Where(classType => classType.Module.Name == "Assembly-CSharp.dll");
 
         return types.Concat(localTypes).Distinct();
+    }
+
+    private static GameObject[] GetObjectsInAllScene(bool includeInactive = true)
+    {
+        var sceneNumber = SceneManager.sceneCount;
+
+        // 空の IEnumerable<T>
+        IEnumerable<GameObject> resultObjects = (GameObject[]) Enumerable.Empty<GameObject>();
+
+        for (int i = 0; i < sceneNumber; i++)
+        {
+            var obj = SceneManager.GetSceneAt(i).GetRootGameObjects();
+            resultObjects = resultObjects.Concat(obj);
+        }
+
+        return resultObjects.ToArray();
     }
 }
